@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include "common.h"
 #include <vector>
+using namespace std;
 
 #define density 0.0005
 #define mass    0.01
@@ -106,10 +107,9 @@ void *thread_routine( void *pthread_id )
               highj = 0;
 
             //For particle in each bin
-            particle_t *my_particle;
             for(int p = 0; p < bins[cbin].size(); p++ )
             {
-                my_particle = bins[cbin][p];
+                 particle_t *my_particle = bins[cbin][p];
 
                 // Set the acceleration to 0 at each timestep
                 my_particle->ax = 0;
@@ -124,7 +124,7 @@ void *thread_routine( void *pthread_id )
                         // loop all particles in the bin
                         for (int k = 0; k < bins[nbin].size(); k++)
                         {
-                            apply_force( &my_particle, *bins[nbin][k], &dmin, &davg, &navg);
+                            apply_force( my_particle, *bins[nbin][k], &dmin, &davg, &navg);
                         }
                     }
                 }
@@ -155,11 +155,10 @@ void *thread_routine( void *pthread_id )
         for( int cbin = first_bin; cbin < last_bin; cbin++ )
         {
             //For particle in each bin
-            particle_t *my_particle;
             for(int p = 0; p < bins[cbin].size(); p++ )
             {
-                my_particle = bins[cbin][p];
-                move( &my_particle ); 
+                particle_t *my_particle = bins[cbin][p];
+                move( my_particle ); 
             }                
         }
         
