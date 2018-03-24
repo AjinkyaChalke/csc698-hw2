@@ -1,0 +1,8 @@
+*.o
+My*
+
+autograder
+mpi
+openmp
+pthreads
+serial
