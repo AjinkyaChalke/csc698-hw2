@@ -80,7 +80,7 @@ void *thread_routine( void *pthread_id )
         
         for (int i = 0; i < n; i++)
         {
-            bin_number = binNum(particles[i],bpr);
+            int bin_number = binNum(particles[i],bpr);
             if (bin_number >= first_bin && bin_number < last_bin)
             {
                 bins[bin_number].push_back(particles + i);        
@@ -112,7 +112,8 @@ void *thread_routine( void *pthread_id )
                 my_particle = bins[cbin][p];
 
                 // Set the acceleration to 0 at each timestep
-                my_particle.ax = my_particle.ay = 0;
+                my_particle->ax = 0;
+                my_particle->ay = 0;
 
                 // 2 loops, for the neighbor bins
                 for (int i = lowi; i <= highi; i++)
@@ -123,7 +124,7 @@ void *thread_routine( void *pthread_id )
                         // loop all particles in the bin
                         for (int k = 0; k < bins[nbin].size(); k++)
                         {
-                            apply_force( my_particle, *bins[nbin][k], &dmin, &davg, &navg);
+                            apply_force( &my_particle, *bins[nbin][k], &dmin, &davg, &navg);
                         }
                     }
                 }
@@ -158,7 +159,7 @@ void *thread_routine( void *pthread_id )
             for(int p = 0; p < bins[cbin].size(); p++ )
             {
                 my_particle = bins[cbin][p];
-                move( my_particle ); 
+                move( &my_particle ); 
             }                
         }
         
