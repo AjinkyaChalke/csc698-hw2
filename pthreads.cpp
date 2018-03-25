@@ -76,13 +76,11 @@ void *thread_routine( void *pthread_id )
         // }
 
         // added start
-        for (int m = first_bin; m < last_bin; m++)
+        for (int m = 0; m < numbins; m++)
             bins[m].clear();
 
-        for (int i = first; i < last; i++)
+        for (int i = 0; i < n; i++)
             bins[binNum(particles[i],bpr)].push_back(particles + i);
-
-        pthread_barrier_wait( &barrier );
 
         //apply forces
 
