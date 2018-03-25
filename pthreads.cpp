@@ -28,7 +28,7 @@ int binNum(particle_t &p, int bpr)
 {
     return ( floor(p.x/cutoff) + bpr*floor(p.y/cutoff) );
 }
-double size;
+
 int bpr ;
 int numbins;
 vector<particle_t*> *bins;
@@ -124,7 +124,7 @@ void *thread_routine( void *pthread_id )
                         // loop all particles in the bin
                         for (int k = 0; k < bins[nbin].size(); k++)
                         {
-                            apply_force( my_particle, *bins[nbin][k], &dmin, &davg, &navg);
+                            apply_force( *my_particle, *bins[nbin][k], &dmin, &davg, &navg);
                         }
                     }
                 }
@@ -158,7 +158,7 @@ void *thread_routine( void *pthread_id )
             for(int p = 0; p < bins[cbin].size(); p++ )
             {
                 particle_t *my_particle = bins[cbin][p];
-                move( my_particle ); 
+                move( *my_particle ); 
             }                
         }
         
@@ -226,7 +226,7 @@ int main( int argc, char **argv )
 
     // added start
 
-    size = sqrt( density*n );
+    double size = sqrt( density*n );
     bpr = ceil(size/cutoff);
     numbins = bpr*bpr;
     bins = new vector<particle_t*>[numbins];
