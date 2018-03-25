@@ -31,7 +31,6 @@ int binNum(particle_t &p, int bpr)
 
 int bpr ;
 int numbins;
-vector<particle_t*> *bins;
 int bins_per_thread;
 pthread_mutex_t *binsMutex;
 
@@ -56,6 +55,7 @@ void *thread_routine( void *pthread_id )
     // added 
     int first_bin = min( thread_id * bins_per_thread, numbins );
     int last_bin = min( (thread_id+1) * bins_per_thread, numbins );
+    vector<particle_t*> *bins = new vector<particle_t*>[numbins];
     
     //
     //  simulate a number of time steps
@@ -79,15 +79,8 @@ void *thread_routine( void *pthread_id )
         for (int m = first_bin; m < last_bin; m++)
             bins[m].clear();
 
-        pthread_barrier_wait( &barrier );
-        
         for (int i = first; i < last; i++)
-        {
-            int bin_number = binNum(particles[i],bpr);
-            pthread_mutex_lock(&binsMutex[bin_number]);
-            bins[bin_number].push_back(particles + i);
-            pthread_mutex_unlock(&binsMutex[bin_number]);    
-        }
+            bins[binNum(particles[i],bpr)].push_back(particles + i);
 
         pthread_barrier_wait( &barrier );
 
@@ -215,7 +208,7 @@ int main( int argc, char **argv )
     double size = sqrt( density*n );
     bpr = ceil(size/cutoff);
     numbins = bpr*bpr;
-    bins = new vector<particle_t*>[numbins];
+    
     bins_per_thread = (numbins + n_threads - 1) / n_threads;
     binsMutex = new pthread_mutex_t[numbins];
     for (int m = 0; m < numbins; m++)
