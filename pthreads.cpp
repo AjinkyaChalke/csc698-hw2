@@ -33,7 +33,7 @@ int bpr ;
 int numbins;
 vector<particle_t*> *bins;
 int bins_per_thread;
-
+pthread_mutex_t *binsMutex;
 
 //
 //  check that pthreads routine call was successful
@@ -49,9 +49,9 @@ void *thread_routine( void *pthread_id )
     double dmin,absmin=1.0,davg,absavg=0.0;
     int thread_id = *(int*)pthread_id;
 
-    // int particles_per_thread = (n + n_threads - 1) / n_threads;
-    // int first = min(  thread_id    * particles_per_thread, n );
-    // int last  = min( (thread_id+1) * particles_per_thread, n );
+    int particles_per_thread = (n + n_threads - 1) / n_threads;
+    int first = min(  thread_id    * particles_per_thread, n );
+    int last  = min( (thread_id+1) * particles_per_thread, n );
 
     // added 
     int first_bin = min( thread_id * bins_per_thread, numbins );
@@ -78,24 +78,28 @@ void *thread_routine( void *pthread_id )
         // added start
         for (int m = first_bin; m < last_bin; m++)
             bins[m].clear();
+
+        pthread_barrier_wait( &barrier );
         
-        for (int i = 0; i < n; i++)
+        for (int i = first; i < last; i++)
         {
             int bin_number = binNum(particles[i],bpr);
-            if (bin_number >= first_bin && bin_number < last_bin)
-            {
-                bins[bin_number].push_back(particles + i);        
-            }
+            pthread_mutex_lock(&binsMutex[bin_number]);
+            bins[bin_number].push_back(particles + i);
+            pthread_mutex_unlock(&binsMutex[bin_number]);    
         }
 
         pthread_barrier_wait( &barrier );
 
         //apply forces
 
-        //For each bin
-        for( int cbin = first_bin; cbin < last_bin; cbin++ )
+        for( int p = first; p < last; p++ )
         {
+            // Set the acceleration to 0 at each timestep
+            particles[p].ax = particles[p].ay = 0;
+
             // check the neighbor bins
+            int cbin = binNum( particles[p], bpr );
             int lowi = -1, highi = 1, lowj = -1, highj = 1;
             if (cbin < bpr)
               lowj = 0;
@@ -106,31 +110,20 @@ void *thread_routine( void *pthread_id )
              if (cbin >= bpr*(bpr-1))
               highj = 0;
 
-            //For particle in each bin
-            for(int p = 0; p < bins[cbin].size(); p++ )
+            // 2 loops, for the neighbor bins
+            for (int i = lowi; i <= highi; i++)
             {
-                 particle_t *my_particle = bins[cbin][p];
-
-                // Set the acceleration to 0 at each timestep
-                my_particle->ax = 0;
-                my_particle->ay = 0;
-
-                // 2 loops, for the neighbor bins
-                for (int i = lowi; i <= highi; i++)
+                for (int j = lowj; j <= highj; j++)
                 {
-                    for (int j = lowj; j <= highj; j++)
+                    int nbin = cbin + i + bpr*j;
+                    // loop all particles in the bin
+                    for (int k = 0; k < bins[nbin].size(); k++)
                     {
-                        int nbin = cbin + i + bpr*j;
-                        // loop all particles in the bin
-                        for (int k = 0; k < bins[nbin].size(); k++)
-                        {
-                            apply_force( *my_particle, *bins[nbin][k], &dmin, &davg, &navg);
-                        }
+                        apply_force( particles[p], *bins[nbin][k], &dmin, &davg, &navg);
                     }
                 }
             }                
         }
-        // added end
 
         pthread_barrier_wait( &barrier );
         
@@ -152,15 +145,8 @@ void *thread_routine( void *pthread_id )
         // for( int i = first; i < last; i++ ) 
         //     move( particles[i] );
 
-        for( int cbin = first_bin; cbin < last_bin; cbin++ )
-        {
-            //For particle in each bin
-            for(int p = 0; p < bins[cbin].size(); p++ )
-            {
-                particle_t *my_particle = bins[cbin][p];
-                move( *my_particle ); 
-            }                
-        }
+        for(int p = first; p < last; p++ )
+            move( particles[p] ); 
         
         pthread_barrier_wait( &barrier );
         
@@ -231,6 +217,9 @@ int main( int argc, char **argv )
     numbins = bpr*bpr;
     bins = new vector<particle_t*>[numbins];
     bins_per_thread = (numbins + n_threads - 1) / n_threads;
+    binsMutex = new pthread_mutex_t[numbins];
+    for (int m = 0; m < numbins; m++)
+        pthread_mutex_init(&binsMutex[m],NULL);
 
     // added end
 
