@@ -4,6 +4,18 @@
 #include <assert.h>
 #include "common.h"
 
+#define density 0.0005
+#define mass    0.01
+#define cutoff  0.01
+#define min_r   (cutoff/100)
+#define dt      0.0005
+
+//Added
+int binNum(particle_t &p, int bpr) 
+{
+    return ( floor(p.x/cutoff) + bpr*floor(p.y/cutoff) );
+}
+
 //
 //  benchmarking program
 //
@@ -13,7 +25,8 @@ int main( int argc, char **argv )
     double dmin, absmin=1.0,davg,absavg=0.0;
     double rdavg,rdmin;
     int rnavg; 
- 
+
+
     //
     //  process command line parameters
     //
@@ -31,6 +44,12 @@ int main( int argc, char **argv )
     int n = read_int( argc, argv, "-n", 1000 );
     char *savename = read_string( argc, argv, "-o", NULL );
     char *sumname = read_string( argc, argv, "-s", NULL );
+
+    //ADDED
+    double size = sqrt( density*n );
+    int bpr = ceil(size/cutoff);
+    int numbins = bpr*bpr;
+    vector<particle_t*> *bins = new vector<particle_t*>[numbins];
     
     //
     //  set up MPI
@@ -92,6 +111,13 @@ int main( int argc, char **argv )
         //  collect all global data locally (not good idea to do)
         //
         MPI_Allgatherv( local, nlocal, PARTICLE, particles, partition_sizes, partition_offsets, PARTICLE, MPI_COMM_WORLD );
+
+        //Added
+        for (int m = 0; m < numbins; m++)
+            bins[m].clear();
+
+        for (int i = 0; i < n; i++) 
+            bins[binNum(particles[i],bpr)].push_back(particles + i);
         
         //
         //  save current step if necessary (slightly different semantics than in other codes)
@@ -103,12 +129,44 @@ int main( int argc, char **argv )
         //
         //  compute all forces
         //
-        for( int i = 0; i < nlocal; i++ )
+        // for( int i = 0; i < nlocal; i++ )
+        // {
+        //     local[i].ax = local[i].ay = 0;
+        //     for (int j = 0; j < n; j++ )
+        //         apply_force( local[i], particles[j], &dmin, &davg, &navg );
+        // }
+
+
+        for( int p = 0; p < nlocal; p++ )
         {
-            local[i].ax = local[i].ay = 0;
-            for (int j = 0; j < n; j++ )
-                apply_force( local[i], particles[j], &dmin, &davg, &navg );
+                // Set the acceleration to 0 at each timestep
+            articles[p].ax = particles[p].ay = 0;
+                
+            // check the neighbor bins
+            int cbin = binNum( particles[p], bpr );
+            int lowi = -1, highi = 1, lowj = -1, highj = 1;
+            
+            if (cbin < bpr)
+                  lowj = 0;
+            if (cbin % bpr == 0)
+                  lowi = 0;
+            if (cbin % bpr == (bpr-1))
+                  highi = 0;
+            if (cbin >= bpr*(bpr-1))
+                  highj = 0;
+
+            // 2 loops, for the neighbor bins
+            for (int i = lowi; i <= highi; i++)
+                for (int j = lowj; j <= highj; j++)   
+                {
+                    int nbin = cbin + i + bpr*j;
+                    // loop all particles in the bin
+                    for (int k = 0; k < bins[nbin].size(); k++ )
+                      apply_force( particles[p], *bins[nbin][k], &dmin, &davg, &navg);
+                }
         }
+
+
      
         if( find_option( argc, argv, "-no" ) == -1 )
         {
