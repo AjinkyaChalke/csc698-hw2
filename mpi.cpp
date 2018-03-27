@@ -144,10 +144,10 @@ int main( int argc, char **argv )
         for( int p = 0; p < nlocal; p++ )
         {
                 // Set the acceleration to 0 at each timestep
-            particles[p].ax = particles[p].ay = 0;
+            local[p].ax = local[p].ay = 0;
                 
             // check the neighbor bins
-            int cbin = binNum( particles[p], bpr );
+            int cbin = binNum( local[p], bpr );
             int lowi = -1, highi = 1, lowj = -1, highj = 1;
             
             if (cbin < bpr)
@@ -166,7 +166,7 @@ int main( int argc, char **argv )
                     int nbin = cbin + i + bpr*j;
                     // loop all particles in the bin
                     for (int k = 0; k < bins[nbin].size(); k++ )
-                      apply_force( particles[p], *bins[nbin][k], &dmin, &davg, &navg);
+                      apply_force( local[p], *bins[nbin][k], &dmin, &davg, &navg);
                 }
         }
 
