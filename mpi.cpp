@@ -6,6 +6,8 @@
 #include <vector>
 #include "common.h"
 
+using namespace std;
+
 #define density 0.0005
 #define mass    0.01
 #define cutoff  0.01
