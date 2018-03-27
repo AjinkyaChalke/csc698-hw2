@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <math.h>
+#include <vector>
 #include "common.h"
 
 #define density 0.0005
@@ -140,7 +142,7 @@ int main( int argc, char **argv )
         for( int p = 0; p < nlocal; p++ )
         {
                 // Set the acceleration to 0 at each timestep
-            articles[p].ax = particles[p].ay = 0;
+            particles[p].ax = particles[p].ay = 0;
                 
             // check the neighbor bins
             int cbin = binNum( particles[p], bpr );
