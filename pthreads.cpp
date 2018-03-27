@@ -12,6 +12,10 @@ using namespace std;
 #define cutoff  0.01
 #define min_r   (cutoff/100)
 #define dt      0.0005
+//
+//  check that pthreads routine call was successful
+//
+#define P( condition ) {if( (condition) != 0 ) { printf( "\n FAILURE in %s, line %d\n", __FILE__, __LINE__ );exit( 1 );}}
 
 //
 //  global variables
@@ -22,23 +26,17 @@ FILE *fsave,*fsum;
 pthread_barrier_t barrier;
 pthread_mutex_t mutex=PTHREAD_MUTEX_INITIALIZER;
 double gabsmin=1.0,gabsavg=0.0;
-
-// added
-int binNum(particle_t &p, int bpr) 
-{
-    return ( floor(p.x/cutoff) + bpr*floor(p.y/cutoff) );
-}
-
 int bpr ;
 int numbins;
 vector<particle_t*> *bins;
 int bins_per_thread;
 
 
-//
-//  check that pthreads routine call was successful
-//
-#define P( condition ) {if( (condition) != 0 ) { printf( "\n FAILURE in %s, line %d\n", __FILE__, __LINE__ );exit( 1 );}}
+// Helper to get the bin number of the particle referred by &p
+int binNum(particle_t &p, int bpr) 
+{
+    return ( floor(p.x/cutoff) + bpr*floor(p.y/cutoff) );
+}
 
 //
 //  This is where the action happens
@@ -49,11 +47,7 @@ void *thread_routine( void *pthread_id )
     double dmin,absmin=1.0,davg,absavg=0.0;
     int thread_id = *(int*)pthread_id;
 
-    // int particles_per_thread = (n + n_threads - 1) / n_threads;
-    // int first = min(  thread_id    * particles_per_thread, n );
-    // int last  = min( (thread_id+1) * particles_per_thread, n );
-
-    // added 
+    // Bins associated with the current thread
     int first_bin = min( thread_id * bins_per_thread, numbins );
     int last_bin = min( (thread_id+1) * bins_per_thread, numbins );
     
@@ -65,17 +59,7 @@ void *thread_routine( void *pthread_id )
         dmin = 1.0;
         navg = 0;
         davg = 0.0;
-        //
-        //  compute forces
-        //
-        // for( int i = first; i < last; i++ )
-        // {
-        //     particles[i].ax = particles[i].ay = 0;
-        //     for (int j = 0; j < n; j++ )
-        //         apply_force( particles[i], particles[j], &dmin, &davg, &navg );
-        // }
-
-        // added start
+       
         for (int m = first_bin; m < last_bin; m++)
             bins[m].clear();
         
@@ -91,7 +75,6 @@ void *thread_routine( void *pthread_id )
         pthread_barrier_wait( &barrier );
 
         //apply forces
-
         //For each bin
         for( int cbin = first_bin; cbin < last_bin; cbin++ )
         {
@@ -109,7 +92,7 @@ void *thread_routine( void *pthread_id )
             //For particle in each bin
             for(int p = 0; p < bins[cbin].size(); p++ )
             {
-                 particle_t *my_particle = bins[cbin][p];
+                particle_t *my_particle = bins[cbin][p];
 
                 // Set the acceleration to 0 at each timestep
                 my_particle->ax = 0;
@@ -123,14 +106,11 @@ void *thread_routine( void *pthread_id )
                         int nbin = cbin + i + bpr*j;
                         // loop all particles in the bin
                         for (int k = 0; k < bins[nbin].size(); k++)
-                        {
                             apply_force( *my_particle, *bins[nbin][k], &dmin, &davg, &navg);
-                        }
                     }
                 }
             }                
         }
-        // added end
 
         pthread_barrier_wait( &barrier );
         
@@ -139,27 +119,20 @@ void *thread_routine( void *pthread_id )
           //
           // Computing statistical data
           // 
-          if (navg) {
+          if (navg) 
+          {
             absavg +=  davg/navg;
             nabsavg++;
           }
           if (dmin < absmin) absmin = dmin;
-	}
+	   }
 
-        //
         //  move particles
-        // //
-        // for( int i = first; i < last; i++ ) 
-        //     move( particles[i] );
-
         for( int cbin = first_bin; cbin < last_bin; cbin++ )
         {
             //For particle in each bin
             for(int p = 0; p < bins[cbin].size(); p++ )
-            {
-                particle_t *my_particle = bins[cbin][p];
-                move( *my_particle ); 
-            }                
+                move(bins[cbin][p]); 
         }
         
         pthread_barrier_wait( &barrier );
