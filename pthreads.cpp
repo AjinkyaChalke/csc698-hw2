@@ -132,7 +132,7 @@ void *thread_routine( void *pthread_id )
         {
             //For particle in each bin
             for(int p = 0; p < bins[cbin].size(); p++ )
-                move(bins[cbin][p]); 
+                move(*bins[cbin][p]); 
         }
         
         pthread_barrier_wait( &barrier );

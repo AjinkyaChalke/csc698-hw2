@@ -10,7 +10,7 @@ CFLAGS = -O3
 LIBS =
 
 
-TARGETS = serial pthreads openmp mpi autograder
+TARGETS = serial openmp mpi autograder
 
 all:	$(TARGETS)
 
@@ -34,7 +34,7 @@ serial.o: serial.cpp common.h
 pthreads.o: pthreads.cpp common.h
 	$(CC) -c $(CFLAGS) pthreads.cpp
 mpi.o: mpi.cpp common.h
-	$(MPCC) -c $(CFLAGS) mpi.cpp
+	$(MPCC) -c $(CFLAGS) mpi.cpp common.cpp grid.cpp
 common.o: common.cpp common.h
 	$(CC) -c $(CFLAGS) common.cpp
 

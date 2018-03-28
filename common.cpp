@@ -5,7 +5,14 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <limits.h>
+#include <mpi.h>
+#ifndef _WIN32
 #include <sys/time.h>
+#else
+#include "gettimeofday.h"
+#endif
+
 #include "common.h"
 
 double size;
@@ -39,9 +46,10 @@ double read_timer( )
 //
 //  keep density constant
 //
-void set_size( int n )
+double set_size( int n )
 {
     size = sqrt( density * n );
+    return size;
 }
 
 //
@@ -49,24 +57,36 @@ void set_size( int n )
 //
 void init_particles( int n, particle_t *p )
 {
-    srand48( time( NULL ) );
-        
+    long seed = (long)time(NULL);
+#ifdef _WIN32
+    srand(seed);
+#else
+    srand48(seed);
+#endif
     int sx = (int)ceil(sqrt((double)n));
     int sy = (n+sx-1)/sx;
-    
+
     int *shuffle = (int*)malloc( n * sizeof(int) );
     for( int i = 0; i < n; i++ )
         shuffle[i] = i;
-    
+
     for( int i = 0; i < n; i++ ) 
     {
         //
         //  make sure particles are not spatially sorted
         //
+        long seed = (long)time(NULL);
+#ifdef _WIN32
+        srand(seed);
+        int j = rand()%(n-i);
+#else
+        srand48(seed);
         int j = lrand48()%(n-i);
+#endif
         int k = shuffle[j];
         shuffle[j] = shuffle[n-i-1];
-        
+
+        p[i].id = i;
         //
         //  distribute particles evenly to ensure proper spacing
         //
@@ -76,8 +96,13 @@ void init_particles( int n, particle_t *p )
         //
         //  assign random velocities within a bound
         //
+#ifdef _WIN32
+        p[i].vx = (double)(rand()/(double)INT_MAX)*2-1;
+        p[i].vy = (double)(rand()/(double)INT_MAX)*2-1;
+#else
         p[i].vx = drand48()*2-1;
         p[i].vy = drand48()*2-1;
+#endif
     }
     free( shuffle );
 }
@@ -85,27 +110,16 @@ void init_particles( int n, particle_t *p )
 //
 //  interact two particles
 //
-void apply_force( particle_t &particle, particle_t &neighbor , double *dmin, double *davg, int *navg)
+void apply_force( particle_t &particle, particle_t &neighbor )
 {
-
     double dx = neighbor.x - particle.x;
     double dy = neighbor.y - particle.y;
     double r2 = dx * dx + dy * dy;
     if( r2 > cutoff*cutoff )
         return;
-	if (r2 != 0)
-        {
-	   if (r2/(cutoff*cutoff) < *dmin * (*dmin))
-	      *dmin = sqrt(r2)/cutoff;
-           (*davg) += sqrt(r2)/cutoff;
-           (*navg) ++;
-        }
-		
     r2 = fmax( r2, min_r*min_r );
     double r = sqrt( r2 );
- 
-    
-	
+
     //
     //  very simple short-range repulsive force
     //
@@ -146,16 +160,38 @@ void move( particle_t &p )
 //
 //  I/O routines
 //
-void save( FILE *f, int n, particle_t *p )
+void save(FILE * f, int rank, int n, particle_t *p, int * locals, int local_size, MPI_Datatype PARTICLE)
 {
-    static bool first = true;
-    if( first )
+    if (rank == 0)
     {
-        fprintf( f, "%d %g\n", n, size );
-        first = false;
+        static bool first = true;
+        if( first )
+        {
+            fprintf( f, "%d %g\n", n, size );
+            first = false;
+        }
+        // Receive all particles from all threads
+        int n_others = n - local_size;
+        for (int i = 0; i < n_others; ++i)
+        {
+            particle_t new_particle;
+            MPI_Recv(&new_particle, 1, PARTICLE, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            p[new_particle.id] = new_particle;
+        }
+        // Write to file
+        for( int i = 0; i < n; i++ )
+            fprintf( f, "%g %g\n", p[i].x, p[i].y );
     }
-    for( int i = 0; i < n; i++ )
-        fprintf( f, "%g %g\n", p[i].x, p[i].y );
+    else
+    {
+        // Send all particles to rank 0
+        for (int i = 0; i < local_size; ++i)
+        {
+            MPI_Send(p+locals[i], 1, PARTICLE, 0, rank, MPI_COMM_WORLD);
+        }
+    }
+    // We don't want any messages spilling out from this function, so wait for everyone.
+    MPI_Barrier(MPI_COMM_WORLD);
 }
 
 //
