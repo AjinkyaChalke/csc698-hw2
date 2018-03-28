@@ -34,7 +34,7 @@ serial.o: serial.cpp common.h
 pthreads.o: pthreads.cpp common.h
 	$(CC) -c $(CFLAGS) pthreads.cpp
 mpi.o: mpi.cpp common.h
-	$(MPCC) -c $(CFLAGS) mpi.cpp common.cpp grid.cpp
+	$(MPCC) -c $(CFLAGS) mpi.cpp
 common.o: common.cpp common.h
 	$(CC) -c $(CFLAGS) common.cpp
 
