@@ -22,17 +22,40 @@ FILE *fsave,*fsum;
 pthread_barrier_t barrier;
 pthread_mutex_t mutex=PTHREAD_MUTEX_INITIALIZER;
 double gabsmin=1.0,gabsavg=0.0;
-
-// added
-int binNum(particle_t &p, int bpr) 
-{
-    return ( floor(p.x/cutoff) + bpr*floor(p.y/cutoff) );
-}
-
+vector<particle_t*> *bins;
 int bpr ;
 int numbins;
 int bins_per_thread;
 pthread_mutex_t *binsMutex;
+
+
+//Helper function to get the bin number a particle belongs to
+int binNum(particle_t &p, int bpr) 
+{
+    return ( floor(p.x/cutoff) + bpr*floor(p.y/cutoff) );
+}
+void bin_add(int bin_num, particle_t& particle)
+{
+    pthread_mutex_lock(&binmutex[bin_num]);
+
+    bins[bin_num].push_back(particle);
+    particle.idx_bin = bins[bin_num].size() - 1;
+
+    pthread_mutex_unlock(&binmutex[bin_num]);
+}
+
+void bin_remove(int bin_num, particle_t& particle)
+{
+    pthread_mutex_lock(&binmutex[bin_num]);
+
+    particle_t* last = bins[bin_num][bins[bin_num].size() - 1];
+    last.idx_bin = particle.idx_bin;
+    bins[bin_num][bins[bin_num].size() - 1] = particle;
+    bins[bin_num][particle.idx_bin] = last;
+    bins[bin_num].pop_back();
+
+    pthread_mutex_unlock(&binmutex[bin_num]);
+}
 
 //
 //  check that pthreads routine call was successful
@@ -51,11 +74,6 @@ void *thread_routine( void *pthread_id )
     int particles_per_thread = (n + n_threads - 1) / n_threads;
     int first = min(  thread_id    * particles_per_thread, n );
     int last  = min( (thread_id+1) * particles_per_thread, n );
-
-    // added 
-    int first_bin = min( thread_id * bins_per_thread, numbins );
-    int last_bin = min( (thread_id+1) * bins_per_thread, numbins );
-    vector<particle_t*> *bins = new vector<particle_t*>[numbins];
     
     //
     //  simulate a number of time steps
@@ -65,25 +83,8 @@ void *thread_routine( void *pthread_id )
         dmin = 1.0;
         navg = 0;
         davg = 0.0;
-        //
-        //  compute forces
-        //
-        // for( int i = first; i < last; i++ )
-        // {
-        //     particles[i].ax = particles[i].ay = 0;
-        //     for (int j = 0; j < n; j++ )
-        //         apply_force( particles[i], particles[j], &dmin, &davg, &navg );
-        // }
-
-        // added start
-        for (int m = 0; m < numbins; m++)
-            bins[m].clear();
-
-        for (int i = 0; i < n; i++)
-            bins[binNum(particles[i],bpr)].push_back(particles + i);
 
         //apply forces
-
         for( int p = first; p < last; p++ )
         {
             // Set the acceleration to 0 at each timestep
@@ -109,9 +110,7 @@ void *thread_routine( void *pthread_id )
                     int nbin = cbin + i + bpr*j;
                     // loop all particles in the bin
                     for (int k = 0; k < bins[nbin].size(); k++)
-                    {
                         apply_force( particles[p], *bins[nbin][k], &dmin, &davg, &navg);
-                    }
                 }
             }                
         }
@@ -128,16 +127,20 @@ void *thread_routine( void *pthread_id )
             nabsavg++;
           }
           if (dmin < absmin) absmin = dmin;
-	}
-
-        //
-        //  move particles
-        // //
-        // for( int i = first; i < last; i++ ) 
-        //     move( particles[i] );
+	   }
 
         for(int p = first; p < last; p++ )
+        {
+            int old_bin_num = binNum(particles[p], bpr);
             move( particles[p] ); 
+            int new_bin_num = binNum(particles[p], bpr);
+
+            if(old_bin_num != new_bin_num)
+            {
+                bin_remove(old_bin_num, particles[p]);
+                bin_add(new_bin_num, particles[p]);
+            }
+        }
         
         pthread_barrier_wait( &barrier );
         
@@ -201,18 +204,22 @@ int main( int argc, char **argv )
     set_size( n );
     init_particles( n, particles );
 
-    // added start
-
     double size = sqrt( density*n );
     bpr = ceil(size/cutoff);
     numbins = bpr*bpr;
-    
-    bins_per_thread = (numbins + n_threads - 1) / n_threads;
+
+    //Initializing bins
+    bins = new vector<particle_t*>[numbins];
+
+    //Initializing mutex required for bins
     binsMutex = new pthread_mutex_t[numbins];
     for (int m = 0; m < numbins; m++)
         pthread_mutex_init(&binsMutex[m],NULL);
 
-    // added end
+    //Initializing bins with particles
+    for(int i = 0; i < n; i++){
+        bin_add(binNum(particles[i], bpr), particles[i])
+
 
     pthread_attr_t attr;
     P( pthread_attr_init( &attr ) );
