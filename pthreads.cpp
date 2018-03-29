@@ -34,27 +34,27 @@ int binNum(particle_t &p, int bpr)
 {
     return ( floor(p.x/cutoff) + bpr*floor(p.y/cutoff) );
 }
-void bin_add(int bin_num, particle_t& particle)
+void bin_add(int bin_num, particle_t* particle)
 {
-    pthread_mutex_lock(&binmutex[bin_num]);
+    pthread_mutex_lock(&binsMutex[bin_num]);
 
     bins[bin_num].push_back(particle);
-    particle.idx_bin = bins[bin_num].size() - 1;
+    particle->idx_bin = bins[bin_num].size() - 1;
 
-    pthread_mutex_unlock(&binmutex[bin_num]);
+    pthread_mutex_unlock(&binsMutex[bin_num]);
 }
 
-void bin_remove(int bin_num, particle_t& particle)
+void bin_remove(int bin_num, particle_t* particle)
 {
-    pthread_mutex_lock(&binmutex[bin_num]);
+    pthread_mutex_lock(&binsMutex[bin_num]);
 
     particle_t* last = bins[bin_num][bins[bin_num].size() - 1];
-    last.idx_bin = particle.idx_bin;
+    last->idx_bin = particle->idx_bin;
     bins[bin_num][bins[bin_num].size() - 1] = particle;
-    bins[bin_num][particle.idx_bin] = last;
+    bins[bin_num][particle->idx_bin] = last;
     bins[bin_num].pop_back();
 
-    pthread_mutex_unlock(&binmutex[bin_num]);
+    pthread_mutex_unlock(&binsMutex[bin_num]);
 }
 
 //
@@ -217,8 +217,8 @@ int main( int argc, char **argv )
         pthread_mutex_init(&binsMutex[m],NULL);
 
     //Initializing bins with particles
-    for(int i = 0; i < n; i++){
-        bin_add(binNum(particles[i], bpr), particles[i])
+    for(int i = 0; i < n; i++)
+        bin_add(binNum(particles[i], bpr), particles[i]);
 
 
     pthread_attr_t attr;
