@@ -137,8 +137,8 @@ void *thread_routine( void *pthread_id )
 
             if(old_bin_num != new_bin_num)
             {
-                bin_remove(old_bin_num, particles[p]);
-                bin_add(new_bin_num, particles[p]);
+                bin_remove(old_bin_num, &particles[p]);
+                bin_add(new_bin_num, &particles[p]);
             }
         }
         
@@ -218,7 +218,7 @@ int main( int argc, char **argv )
 
     //Initializing bins with particles
     for(int i = 0; i < n; i++)
-        bin_add(binNum(particles[i], bpr), particles[i]);
+        bin_add(binNum(particles[i], bpr), &particles[i]);
 
 
     pthread_attr_t attr;
