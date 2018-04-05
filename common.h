@@ -15,6 +15,7 @@ const int SAVEFREQ = 10;
 //
 typedef struct 
 {
+  int idx_bin;	
   double x;
   double y;
   double vx;
